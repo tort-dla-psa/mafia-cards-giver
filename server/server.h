@@ -28,6 +28,7 @@ public:
         :QObject(parent)
     {
         wait_room = new WaitingRoom();
+        tg_thread = new QThread();
         connect(wait_room, &WaitingRoom::roomJoinRequested,
             this, &Server::onRoomJoinRequested);
         connect(wait_room, &WaitingRoom::roomCreateRequested,
@@ -43,7 +44,6 @@ public:
             wrapper, &TgWrapper::WriteTo);
         connect(tg_thread, &QThread::started,
             wrapper, &TgWrapper::run);
-        tg_thread = new QThread();
         wrapper->moveToThread(tg_thread);
     }
     ~Server(){
