@@ -41,7 +41,20 @@ public:
     }
 public slots:
     void onTgStartMessage(TgBot::Message::Ptr message){
-        auto plr = new Player(message->chat->id, message->chat->username);
+        auto id = message->chat->id;
+        auto plr_it = wait_room->findPlayer(id);
+        if(plr_it && *plr_it){
+            std::cerr<<"double /start from "<<(*plr_it)->get_nick()<<"\n";
+            return;
+        }
+        for(auto r:rooms){
+            plr_it = r->findPlayer(id);
+            if(plr_it && *plr_it){
+                std::cerr<<"double /start from "<<(*plr_it)->get_nick()<<"\n";
+                return;
+            }
+        }
+        auto plr = new Player(id, message->chat->username);
         wait_room->addPlayer(plr);
     }
     void onTgMessage(TgBot::Message::Ptr message){
@@ -95,10 +108,10 @@ public slots:
             if(room->get_pass() == pass){
                 wait_room->removePlayer(plr);
                 room->addPlayer(plr);
-		    writeTo(plr->get_id(),"welcome to room  '"+room->get_id()+"'");
+                writeTo(plr->get_id(),"welcome to room  '"+room->get_id()+"'");
             }else{
-		    writeTo(plr->get_id(),"your pass '"+pass+"' is invalid");
-	    }
+                writeTo(plr->get_id(),"your pass '"+pass+"' is invalid");
+            }
         }
     }
     void onRoomCreateRequested(Player* plr, std::string pass){
