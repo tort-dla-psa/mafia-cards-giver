@@ -4,7 +4,8 @@
 class Player{
 protected:
 friend class Admin;
-    const int id;
+friend class Server;
+    int id;
     std::string username;
 public:
     Player(int id, const std::string &username)
@@ -26,8 +27,7 @@ public:
         :Player(id, username)
     {}
 
-    //constructor that moves and secures data from player
-    Admin(Player*& plr)
+    Admin(Player* plr)
         :Player(plr->id, plr->username)
     {}
 };

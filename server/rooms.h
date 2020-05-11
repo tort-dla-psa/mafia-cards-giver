@@ -282,10 +282,10 @@ public:
             }
             emit roomCreateRequested(plr, pass);
         }else if(cmd_str == join_cmd){
-		std::string pass = "";
-	    if(list.size() == 3){
-		    pass = list.at(2).toStdString();
-	    }
+            std::string pass = "";
+            if(list.size() == 3){
+                pass = list.at(2).toStdString();
+            }
             auto id = list.at(1).toStdString();
             emit roomJoinRequested(plr, id, pass);
         }

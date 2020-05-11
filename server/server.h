@@ -45,12 +45,14 @@ public slots:
         auto plr_it = wait_room->findPlayer(id);
         if(plr_it && *plr_it){
             std::cerr<<"double /start from "<<(*plr_it)->get_nick()<<"\n";
+            (*plr_it)->id = id;
             return;
         }
         for(auto r:rooms){
             plr_it = r->findPlayer(id);
             if(plr_it && *plr_it){
                 std::cerr<<"double /start from "<<(*plr_it)->get_nick()<<"\n";
+                (*plr_it)->id = id;
                 return;
             }
         }
@@ -121,7 +123,6 @@ public slots:
 
         auto room = new GameRoom(adm, pass);
         room->id = gen.get_id();
-        //ISSUE: is it legal?
         connect(room, &GameRoom::writeTo,
             this, &Server::writeTo);
         std::cout<<"new room, id:"<<room->get_id()
