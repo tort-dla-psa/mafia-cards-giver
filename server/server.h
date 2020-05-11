@@ -79,6 +79,7 @@ public slots:
         }
     }
     void onRoomJoinRequested(Player* plr, std::string id, std::string pass){
+	    std::cout<<"got join request, user:"<<plr->get_nick()<<" room:"<<id<<" pass:"<<pass<<"\n";
         auto predicate = [&id](GameRoom* room){
             if(room->get_id() == id){
                 return true;
@@ -87,14 +88,17 @@ public slots:
             }
         };
         auto room_it = std::find_if(rooms.begin(), rooms.end(), predicate);
-        if(room_it == rooms.end()){
+        if(room_it == rooms.end() || !*room_it){
             writeTo(plr->get_id(), "there's no room with id "+id);
         }else{
             auto room = *room_it;
             if(room->get_pass() == pass){
                 wait_room->removePlayer(plr);
                 room->addPlayer(plr);
-            }
+		    writeTo(plr->get_id(),"welcome to room  '"+room->get_id()+"'");
+            }else{
+		    writeTo(plr->get_id(),"your pass '"+pass+"' is invalid");
+	    }
         }
     }
     void onRoomCreateRequested(Player* plr, std::string pass){
@@ -109,7 +113,8 @@ public slots:
             this, &Server::writeTo);
         std::cout<<"new room, id:"<<room->get_id()
             <<" pass:"<<room->get_pass()<<"\n";
-        emit writeTo(adm->get_id(), "your room id: "+room->get_id()); 
+        emit writeTo(adm->get_id(), "your room id: "+room->get_id()+
+		" pass:"+room->get_pass()); 
         connect(room, &Room::empty,
             this, &Server::onRoomEmpty);
         rooms.push_back(room);

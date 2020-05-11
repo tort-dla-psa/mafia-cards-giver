@@ -282,7 +282,6 @@ public:
             }
             emit roomCreateRequested(plr, pass);
         }else if(cmd_str == join_cmd){
-            // /join abcdef pass
 		std::string pass = "";
 	    if(list.size() == 3){
 		    pass = list.at(2).toStdString();
