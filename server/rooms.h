@@ -187,7 +187,7 @@ public:
     void processMessage(TgWrapper::msg tg_mes)override{
         std::string mes = tg_mes->text;
         auto plr_it = findPlayer(tg_mes->chat->id);
-        if(!plr_it){
+        if(!plr_it || !*plr_it){
             std::cerr<<"no user with id"<<tg_mes->chat->id<<" in room "+get_id()<<"\n";
             return;
         }
@@ -254,7 +254,7 @@ class WaitingRoom:public Room{
     Q_OBJECT
     const std::string start_cmd, join_cmd;
 public:
-    WaitingRoom(const std::string start_cmd="/start",
+    WaitingRoom(const std::string start_cmd="/create",
         const std::string join_cmd="/join")
     :Room(),
         start_cmd(start_cmd),
@@ -262,7 +262,7 @@ public:
     {}
     void processMessage(TgWrapper::msg tg_mes)override{
         auto plr_it = findPlayer(tg_mes->chat->id);
-        if(!plr_it){
+        if(!plr_it || !*plr_it){
             std::cerr<<"no user with id"<<tg_mes->chat->id<<" in waiting room \n";
             return;
         }
@@ -283,8 +283,11 @@ public:
             emit roomCreateRequested(plr, pass);
         }else if(cmd_str == join_cmd){
             // /join abcdef pass
+		std::string pass = "";
+	    if(list.size() == 3){
+		    pass = list.at(2).toStdString();
+	    }
             auto id = list.at(1).toStdString();
-            auto pass = list.at(2).toStdString();
             emit roomJoinRequested(plr, id, pass);
         }
     }

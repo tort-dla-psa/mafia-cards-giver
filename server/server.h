@@ -60,13 +60,13 @@ public slots:
     void onTgMessage(TgWrapper::msg message){
         auto id = message->chat->id;
         auto plr_it = wait_room->findPlayer(id);
-        if(plr_it){
+        if(plr_it && *plr_it){
             wait_room->processMessage(message);
             return;
         }
         for(auto r:rooms){
             plr_it = r->findPlayer(id);
-            if(plr_it){
+            if(plr_it && *plr_it){
                 r->processMessage(message);
                 return;
             }
@@ -85,6 +85,7 @@ public slots:
         };
         auto room_it = std::find_if(rooms.begin(), rooms.end(), predicate);
         if(room_it == rooms.end()){
+		emit writeTo(plr->get_id(), "there's no room with id "+id);
         }else{
             auto room = *room_it;
             if(room->get_pass() == pass){
