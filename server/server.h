@@ -3,53 +3,75 @@
 #include <QTcpSocket>
 #include <QTcpServer>
 #include <QObject>
+#include <QThread>
 #include <QString>
 #include "players.h"
 #include "id_gen.h"
 #include "rooms.h"
 #include "roles.h"
+#include "tg_wrapper.h"
 #include <iostream>
 #include <vector>
 #include <memory>
 
-class Server:public QTcpServer{
+class Server:public QObject{
     Q_OBJECT
 
-    quint16 port;
     WaitingRoom* wait_room;
     QVector<GameRoom*> rooms;
-    std::vector<std::unique_ptr<Role>> roles;
 
     IdGenerator gen;
+    QThread* tg_thread;
+    TgWrapper* wrapper;
 public:
-    Server(quint16 port, QObject* parent=nullptr)
-        :QTcpServer(parent),
-        port(port)
+    Server(const std::string &api_key, QObject* parent=nullptr)
+        :QObject(parent)
     {
         wait_room = new WaitingRoom();
         connect(wait_room, &WaitingRoom::roomJoinRequested,
             this, &Server::onRoomJoinRequested);
         connect(wait_room, &WaitingRoom::roomCreateRequested,
             this, &Server::onRoomCreateRequested);
-        connect(this, &QTcpServer::newConnection,
-            this, &Server::onNewConnection);
+        wrapper = new TgWrapper(api_key);
+        connect(wrapper, &TgWrapper::gotMessage, 
+            this, &Server::onTgMessage);
+        connect(wrapper, &TgWrapper::gotStartMessage, 
+            this, &Server::onTgStartMessage);
+        connect(this, &Server::writeTo,
+            wrapper, &TgWrapper::WriteTo);
+        connect(wait_room, &WaitingRoom::writeTo,
+            wrapper, &TgWrapper::WriteTo);
+        tg_thread = new QThread();
+        wrapper->moveToThread(tg_thread);
     }
     ~Server(){
+        tg_thread->quit();
+        tg_thread->deleteLater();
+        delete wrapper;
         delete wait_room;
     }
 public slots:
-    void onNewConnection(){
-        //[virtual]QTcpSocket *QTcpServer::nextPendingConnection()
-        auto client_socket =  nextPendingConnection();
-        auto addr = client_socket->peerAddress().toString();
-        std::cout<<"new connection:"<<addr.toStdString()<<"\n";
-        auto plr = new Player(client_socket);
-        connect(plr, &Player::gotMessage,
-            wait_room, &WaitingRoom::onPlayerMessage);
+    void onTgStartMessage(TgWrapper::msg message){
+        auto plr = new Player(message->chat->id, message->chat->username);
         wait_room->addPlayer(plr);
     }
+    void onTgMessage(TgWrapper::msg message){
+        auto id = message->chat->id;
+        auto plr_it = wait_room->findPlayer(id);
+        if(plr_it){
+            wait_room->processMessage(message);
+            return;
+        }
+        for(auto r:rooms){
+            plr_it = r->findPlayer(id);
+            if(plr_it){
+                r->processMessage(message);
+                return;
+            }
+        }
+    }
     void run(){
-        this->listen(QHostAddress::Any, port);
+        tg_thread->start();
     }
     void onRoomJoinRequested(Player* plr, std::string id, std::string pass){
         auto predicate = [&id](GameRoom* room){
@@ -65,38 +87,23 @@ public slots:
             auto room = *room_it;
             if(room->get_pass() == pass){
                 wait_room->removePlayer(plr);
-                disconnect(plr, &Player::gotMessage,
-                    wait_room, &WaitingRoom::onPlayerMessage);
-                disconnect(plr, &Player::disconnected,
-                    wait_room, &WaitingRoom::onPlayerDisconnect);
-                disconnect(plr, &Player::disconnected,
-                    wait_room, &WaitingRoom::onPlayerDisconnect);
-                connect(plr, &Player::gotMessage,
-                    room, &GameRoom::onPlayerMessage);
                 room->addPlayer(plr);
             }
         }
     }
     void onRoomCreateRequested(Player* plr, std::string pass){
         wait_room->removePlayer(plr);
-        disconnect(plr, &Player::gotMessage,
-            wait_room, &WaitingRoom::onPlayerMessage);
-        disconnect(plr, &Player::disconnected,
-            wait_room, &WaitingRoom::onPlayerDisconnect);
         auto adm = new Admin(plr);
         delete plr;
 
         auto room = new GameRoom(adm, pass);
         room->id = gen.get_id();
+        //ISSUE: is it legal?
+        connect(room, &GameRoom::writeTo,
+            wrapper, &TgWrapper::WriteTo);
         std::cout<<"new room, id:"<<room->get_id()
             <<" pass:"<<room->get_pass()<<"\n";
-        adm->write("your room id: "+room->get_id());
-        connect(adm, &Admin::gotMessage,
-            room, &GameRoom::onPlayerMessage);
-        disconnect(adm, &Admin::disconnected,
-            room, &Room::onPlayerDisconnect);
-        connect(adm, &Admin::disconnected,
-            room, &GameRoom::onPlayerDisconnect);
+        emit writeTo(adm->get_id(), "your room id: "+room->get_id()); 
         connect(room, &Room::empty,
             this, &Server::onRoomEmpty);
         rooms.push_back(room);
@@ -109,4 +116,5 @@ public slots:
     }
 signals:
     void finished();
+    void writeTo(int, std::string);
 };

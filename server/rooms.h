@@ -1,6 +1,7 @@
 #pragma once
 #include "players.h"
 #include "roles.h"
+#include "tg_wrapper.h"
 #include <QObject>
 #include <QVector>
 #include <QString>
@@ -21,37 +22,45 @@ struct settings{
 class Room:public QObject{
     Q_OBJECT
 protected:
-    QVector<Player*> clients;
+    QVector<Player*> players;
 public:
     Room():QObject(){}
     ~Room(){
-        for(auto &cl:clients){
+        for(auto &cl:players){
             delete cl;
         }
-        clients.clear();
+        players.clear();
     }
     void addPlayer(Player* pl){
-        clients.push_back(pl);
-        connect(pl, &Player::disconnected,
-            this, &Room::onPlayerDisconnect);
+        players.push_back(pl);
     }
-
     //Note:removes from container in Room
     void removePlayer(Player* plr){
-        clients.removeOne(plr);
+        players.removeOne(plr);
     }
+    Player** findPlayer(int id){
+        return std::find_if(players.begin(), players.end(), 
+            [&id](const auto &pl){
+                return pl->get_id() == id;
+            });
+    }
+    Player** findPlayer(const std::string &nick){
+        return std::find_if(players.begin(), players.end(), 
+            [&nick](const auto &pl){
+                return pl->get_nick() == nick;
+            });
+    }
+    virtual void processMessage(TgWrapper::msg mes)=0;
+
 public slots:
-    //abstract method
-    virtual void onPlayerMessage(std::string mes)=0;
     virtual void onPlayerDisconnect(){
-        auto pl = dynamic_cast<Player*>(sender());
-        auto addr = pl->get_addr();
-        auto addr_str = addr.toString().toStdString();
-        std::cout<<"someone disconnected:"<<addr_str<<"\n";
-        clients.removeOne(pl);
+        //TODO:fix
+        auto pl = nullptr;
+        players.removeOne(pl);
     }
 signals:
     void empty();
+    void writeTo(int id, std::string mes);
 };
 
 class GameRoom:public Room{
@@ -89,24 +98,24 @@ class GameRoom:public Room{
             std::stringstream ss;
             ss<<"unknown cmd:"<<cmd<<"\n";
             std::cerr<<ss.str();
-            adm->write(ss.str());
+            emit writeTo(adm->get_id(), ss.str());
         }
         auto sets_str = get_settings();
         std::cout<<sets_str;
         std::cout.flush();
-        adm->write(sets_str);
+        emit writeTo(adm->get_id(), sets_str);
     }
 
     void shuffle(){
         roles.clear();
-        size_t citizen_count = clients.size()-1; //without admin
+        size_t citizen_count = players.size()-1; //without admin
         auto check_mes = [this](const std::string &name, const size_t &count){
-            if(count > clients.size()-1){
+            if(count > players.size()-1){
                 std::stringstream ss;
                 ss<<"Error: you set category \""<<name<<"\"to be this large:"<<count
-                    <<"but there's only "<<clients.size()-1<<" players\n";
+                    <<"but there's only "<<players.size()-1<<" players\n";
                 std::cerr<<ss.str();
-                adm->write(ss.str());
+                emit writeTo(adm->get_id(), ss.str());
             }
         };
         for(int i = 0; i<set.cops_count; i++){
@@ -139,18 +148,18 @@ class GameRoom:public Room{
         }
         std::random_shuffle(roles.begin(), roles.end());
         auto role_it = roles.begin();
-        for(int i=0; i<clients.size(); i++){
-            auto plr = clients.at(i);
+        for(int i=0; i<players.size(); i++){
+            auto plr = players.at(i);
             auto adm = dynamic_cast<Admin*>(plr);
             if(adm){
                 continue;
             }
             auto& role = *role_it;
             role_it++;
-            plr->write(std::to_string(role->get_id()));
+            emit writeTo(plr->get_id(), std::to_string(role->get_id()));
             std::cout<<"Room "<<get_id()
-                <<": sent role "<<role->get_id()
-                <<"to "<<plr->get_addr().toString().toStdString()<<"\n";
+                <<": sent role "<<role->get_role_name()
+                <<"to "<<plr->get_nick()<<"\n";
         }
     }
 public:
@@ -175,6 +184,41 @@ public:
         this->pass = pass;
     }
 
+    void processMessage(TgWrapper::msg tg_mes)override{
+        std::string mes = tg_mes->text;
+        auto plr_it = findPlayer(tg_mes->chat->id);
+        if(!plr_it){
+            std::cerr<<"no user with id"<<tg_mes->chat->id<<" in room "+get_id()<<"\n";
+            return;
+        }
+        auto plr = *plr_it;
+        std::cout<<"GameRoom id "<<get_id()<<":"
+            <<"player "<<plr->get_nick()
+            <<" wrote this:"<<mes<<"\n";
+        auto adm = dynamic_cast<Admin*>(plr);
+        if(!adm){
+            return;
+        }else{
+            QString str = QString::fromStdString(mes);
+            auto list = str.split(' ');
+            check_settings_cmd(list);
+            if(list.at(0).toStdString() == shuffle_cmd){
+                auto sum = set.cops_count+
+                    set.killer_count+
+                    set.mafia_count+
+                    set.medic_count+
+                    set.slut_count;
+                if(sum > players.size()-1){
+                    auto err_mes = "settings summ not equal to players count, "
+                        +std::to_string(sum)+"!="+std::to_string(players.size()-1);
+                    std::cerr<<err_mes<<"\n";
+                    emit writeTo(adm->get_id(), err_mes);
+                }else{
+                    shuffle();
+                }
+            }
+        }
+    }
     const std::string& get_pass()const{
         return pass;
     }
@@ -191,45 +235,16 @@ public:
         return ss.str();
     }
 public slots:
-    void onPlayerMessage(std::string mes)override{
-        auto plr = dynamic_cast<Player*>(sender());
-        std::cout<<"GameRoom id "<<get_id()<<":"
-            <<"player "<<plr->get_addr().toString().toStdString()
-            <<" wrote this:"<<mes<<"\n";
-        auto adm = dynamic_cast<Admin*>(sender());
-        if(!adm){
-            return;
-        }else{
-            QString str = QString::fromStdString(mes);
-            auto list = str.split(' ');
-            check_settings_cmd(list);
-            if(list.at(0).toStdString() == shuffle_cmd){
-                auto sum = set.cops_count+
-                    set.killer_count+
-                    set.mafia_count+
-                    set.medic_count+
-                    set.slut_count;
-                if(sum > clients.size()-1){
-                    auto err_mes = "settings summ not equal to players count, "
-                        +std::to_string(sum)+"!="+std::to_string(clients.size()-1);
-                    std::cerr<<err_mes<<"\n";
-                    adm->write(err_mes);
-                }else{
-                    shuffle();
-                }
-            }
-        }
-    }
     void onPlayerDisconnect()override{
         Room::onPlayerDisconnect();
         auto pl = (Player*)sender();
         auto adm_cast = dynamic_cast<Admin*>(pl);
         if(adm_cast){
             std::cout<<"admin disconnected!\n";
-            for(auto &cl:clients){
+            for(auto &cl:players){
                 delete cl;
             }
-            clients.clear();
+            players.clear();
             emit empty();
         }
     }
@@ -245,10 +260,15 @@ public:
         start_cmd(start_cmd),
         join_cmd(join_cmd)
     {}
-public slots:
-    void onPlayerMessage(std::string mes)override{
-        auto plr = (Player*)sender();
-        std::cout<<"Waiting room:"<<plr->get_addr().toString().toStdString()
+    void processMessage(TgWrapper::msg tg_mes)override{
+        auto plr_it = findPlayer(tg_mes->chat->id);
+        if(!plr_it){
+            std::cerr<<"no user with id"<<tg_mes->chat->id<<" in waiting room \n";
+            return;
+        }
+        auto plr = *plr_it;
+        std::string mes = tg_mes->text;
+        std::cout<<"Waiting room:"<<plr->get_nick()
             <<" wrote this:"<<mes<<"\n";
         QString str = QString::fromStdString(mes);
         auto list = str.split(' ');
@@ -268,10 +288,11 @@ public slots:
             emit roomJoinRequested(plr, id, pass);
         }
     }
+public slots:
     void onPlayerDisconnect()override{
         Room::onPlayerDisconnect();
         auto pl = dynamic_cast<Player*>(sender());
-        clients.removeOne(pl);
+        players.removeOne(pl);
         delete pl;
     }
 signals:
