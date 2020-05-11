@@ -127,8 +127,8 @@ public slots:
             this, &Server::writeTo);
         std::cout<<"new room, id:"<<room->get_id()
             <<" pass:"<<room->get_pass()<<"\n";
-        emit writeTo(adm->get_id(), "your room id: "+room->get_id()+
-		" pass:"+room->get_pass()); 
+        writeTo(adm->get_id(), "your room id: "+room->get_id()+
+            " pass:"+room->get_pass()); 
         connect(room, &Room::empty,
             this, &Server::onRoomEmpty);
         rooms.push_back(room);

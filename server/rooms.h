@@ -36,7 +36,16 @@ public:
     }
     //Note:removes from container in Room
     void removePlayer(Player* plr){
-        players.removeOne(plr);
+        if(!plr){
+            return;
+        }
+        players.removeAll(plr);
+        for(auto &plr_:players){
+            if(plr->get_id() == plr_->get_id()){
+                players.removeOne(plr_);
+            }
+        }
+        players.squeeze();
     }
     Player** findPlayer(int id){
         return std::find_if(players.begin(), players.end(), 
