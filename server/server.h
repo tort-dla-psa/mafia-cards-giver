@@ -42,6 +42,7 @@ public:
 public slots:
     void onTgStartMessage(TgBot::Message::Ptr message){
         auto id = message->chat->id;
+        std::cout<<"git /start message in chat "<<id<<"\n";
         auto plr_it = wait_room->findPlayer(id);
         if(plr_it && *plr_it){
             std::cerr<<"double /start from "<<(*plr_it)->get_nick()<<"\n";
