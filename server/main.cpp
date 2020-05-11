@@ -8,7 +8,10 @@
 #include <QtCore>
 #include <iostream>
 #include "server.h"
+#include "tg_wrapper.h"
 
+Q_DECLARE_METATYPE(std::string)
+Q_DECLARE_METATYPE(TgWrapper::msg)
 int main(int argc, char* argv[]){
     std::string key;
     if(argc != 2){
