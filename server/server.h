@@ -108,9 +108,14 @@ public slots:
         }else{
             auto room = *room_it;
             if(room->get_pass() == pass){
+                auto plr_it = room->findPlayer(plr->get_id());
+                if(plr_it && *plr_it){
+                    writeTo(plr->get_id(),"you're allready in room '"+room->get_id()+"'");
+                    return;
+                }
                 wait_room->removePlayer(plr);
                 room->addPlayer(plr);
-                writeTo(plr->get_id(),"welcome to room  '"+room->get_id()+"'");
+                writeTo(plr->get_id(),"welcome to room '"+room->get_id()+"'");
             }else{
                 writeTo(plr->get_id(),"your pass '"+pass+"' is invalid");
             }
