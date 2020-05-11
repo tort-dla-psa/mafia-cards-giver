@@ -8,12 +8,12 @@
 #include <QtCore>
 #include <iostream>
 #include "server.h"
-#include "tg_wrapper.h"
+#include "tgbot/tgbot.h"
 
 Q_DECLARE_METATYPE(std::string)
-Q_DECLARE_METATYPE(TgWrapper::msg)
+Q_DECLARE_METATYPE(TgBot::Message::Ptr)
 int main(int argc, char* argv[]){
-	qRegisterMetaType<TgWrapper::msg>("msg");
+	qRegisterMetaType<TgBot::Message::Ptr>("msg");
 	qRegisterMetaType<std::string>("std_str");
     std::string key;
     if(argc != 2){

@@ -24,7 +24,6 @@ include_directories(submodules/tgbot-cpp/include)
 add_subdirectory(submodules/tgbot-cpp)
 
 set(SRV_HEADERS server/server.h
-    server/tg_wrapper.h
     server/rooms.h)
 qt5_wrap_cpp(moc_sources_srv ${SRV_HEADERS})
 

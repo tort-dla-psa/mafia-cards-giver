@@ -1,6 +1,5 @@
 #pragma once
 #include <iostream>
-#include "tg_wrapper.h"
 
 class Player{
 protected:

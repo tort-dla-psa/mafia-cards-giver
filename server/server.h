@@ -3,16 +3,15 @@
 #include <QTcpSocket>
 #include <QTcpServer>
 #include <QObject>
-#include <QThread>
 #include <QString>
 #include "players.h"
 #include "id_gen.h"
 #include "rooms.h"
 #include "roles.h"
-#include "tg_wrapper.h"
+#include <tgbot/tgbot.h>
+#include <memory>
 #include <iostream>
 #include <vector>
-#include <memory>
 
 class Server:public QObject{
     Q_OBJECT
@@ -21,43 +20,31 @@ class Server:public QObject{
     QVector<GameRoom*> rooms;
 
     IdGenerator gen;
-    QThread* tg_thread;
-    TgWrapper* wrapper;
+    const std::string key;
+    std::unique_ptr<TgBot::Bot> bot;
+    TgBot::CurlHttpClient curl;
 public:
-    Server(const std::string &api_key, QObject* parent=nullptr)
-        :QObject(parent)
+    Server(const std::string &key, QObject* parent=nullptr)
+        :QObject(parent),
+        key(key)
     {
         wait_room = new WaitingRoom();
-        tg_thread = new QThread();
         connect(wait_room, &WaitingRoom::roomJoinRequested,
             this, &Server::onRoomJoinRequested);
         connect(wait_room, &WaitingRoom::roomCreateRequested,
             this, &Server::onRoomCreateRequested);
-        wrapper = new TgWrapper(api_key);
-        connect(wrapper, &TgWrapper::gotMessage, 
-            this, &Server::onTgMessage);
-        connect(wrapper, &TgWrapper::gotStartMessage, 
-            this, &Server::onTgStartMessage);
-        connect(this, &Server::writeTo,
-            wrapper, &TgWrapper::WriteTo);
         connect(wait_room, &WaitingRoom::writeTo,
-            wrapper, &TgWrapper::WriteTo);
-        connect(tg_thread, &QThread::started,
-            wrapper, &TgWrapper::run);
-        wrapper->moveToThread(tg_thread);
+            this, &Server::writeTo);
     }
     ~Server(){
-        tg_thread->quit();
-        tg_thread->deleteLater();
-        delete wrapper;
         delete wait_room;
     }
 public slots:
-    void onTgStartMessage(TgWrapper::msg message){
+    void onTgStartMessage(TgBot::Message::Ptr message){
         auto plr = new Player(message->chat->id, message->chat->username);
         wait_room->addPlayer(plr);
     }
-    void onTgMessage(TgWrapper::msg message){
+    void onTgMessage(TgBot::Message::Ptr message){
         auto id = message->chat->id;
         auto plr_it = wait_room->findPlayer(id);
         if(plr_it && *plr_it){
@@ -73,7 +60,23 @@ public slots:
         }
     }
     void run(){
-        tg_thread->start();
+        bot = std::make_unique<TgBot::Bot>(key, curl);
+        bot->getEvents().onAnyMessage(
+            [this](TgBot::Message::Ptr message) {
+                if(message->text == "/start"){
+                    onTgStartMessage(message);
+                }else{
+                    onTgMessage(message);
+                }
+        });
+        try {
+            TgBot::TgLongPoll longPoll(*bot);
+            while (true) {
+                longPoll.start();
+            }
+        } catch (TgBot::TgException& e) {
+            std::cout<<"ERROR: "<<e.what()<<std::endl;
+        }
     }
     void onRoomJoinRequested(Player* plr, std::string id, std::string pass){
         auto predicate = [&id](GameRoom* room){
@@ -85,7 +88,7 @@ public slots:
         };
         auto room_it = std::find_if(rooms.begin(), rooms.end(), predicate);
         if(room_it == rooms.end()){
-		emit writeTo(plr->get_id(), "there's no room with id "+id);
+            writeTo(plr->get_id(), "there's no room with id "+id);
         }else{
             auto room = *room_it;
             if(room->get_pass() == pass){
@@ -103,7 +106,7 @@ public slots:
         room->id = gen.get_id();
         //ISSUE: is it legal?
         connect(room, &GameRoom::writeTo,
-            wrapper, &TgWrapper::WriteTo);
+            this, &Server::writeTo);
         std::cout<<"new room, id:"<<room->get_id()
             <<" pass:"<<room->get_pass()<<"\n";
         emit writeTo(adm->get_id(), "your room id: "+room->get_id()); 
@@ -117,7 +120,13 @@ public slots:
         std::cout<<"room id:"<<room->get_id()<<" is empty now\n";
         delete room;
     }
+    void writeTo(int id, std::string mes){
+        try{
+            bot->getApi().sendMessage(id, mes);
+        } catch (TgBot::TgException& e) {
+            std::cout<<"ERROR: "<<e.what()<<std::endl;
+        }
+    }
 signals:
     void finished();
-    void writeTo(int, std::string);
 };
