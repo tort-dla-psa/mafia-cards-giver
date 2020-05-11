@@ -41,6 +41,8 @@ public:
             wrapper, &TgWrapper::WriteTo);
         connect(wait_room, &WaitingRoom::writeTo,
             wrapper, &TgWrapper::WriteTo);
+        connect(tg_thread, &QThread::started,
+            wrapper, &TgWrapper::run);
         tg_thread = new QThread();
         wrapper->moveToThread(tg_thread);
     }
