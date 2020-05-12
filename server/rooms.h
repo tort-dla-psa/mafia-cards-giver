@@ -332,7 +332,7 @@ public:
             std::string pass = "";
             if(list.size() == 3){
                 pass = list.at(2);
-            }else if(list.size() > 3){
+            }else if(list.size() > 3 || list.size() < 2){
                 write_to(tg_mes->chat->id, "Usage: /join [id] [pass(optional)]");
                 return;
             }
