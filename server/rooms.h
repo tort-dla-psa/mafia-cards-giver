@@ -47,6 +47,12 @@ public:
     ~Room(){
         players.clear();
     }
+    auto begin(){
+        return players.begin();
+    }
+    auto end(){
+        return players.end();
+    }
     auto get_requests(){
         return std::move(reqs);
     }
@@ -174,6 +180,7 @@ class GameRoom:public Room{
         }
         std::random_shuffle(roles.begin(), roles.end());
         auto role_it = roles.begin();
+        std::stringstream roles_for_adm;
         for(int i=0; i<players.size(); i++){
             auto plr = players.at(i);
             auto adm = std::dynamic_pointer_cast<Admin>(plr);
@@ -182,11 +189,15 @@ class GameRoom:public Room{
             }
             auto& role = *role_it;
             role_it++;
-            write_to(plr->get_id(), std::to_string(role->get_id()));
+            auto mes = "your role is '"+role->get_role_name()+"'. good luck with it!";
+            write_to(plr->get_id(), mes);
+            roles_for_adm<<"@"<<plr->get_nick()<<" has role '"+role->get_role_name()+"'\n";
             std::cout<<"Room "<<get_id()
                 <<": sent role "<<role->get_role_name()
                 <<"to "<<plr->get_nick()<<"\n";
         }
+        std::cout<<roles_for_adm.str();
+        write_to(GameRoom::adm->get_id(), roles_for_adm.str());
     }
 public:
     GameRoom(std::shared_ptr<Admin> adm,

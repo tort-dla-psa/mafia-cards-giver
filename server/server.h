@@ -43,7 +43,7 @@ public:
 
     void onTgStartMessage(TgBot::Message::Ptr message){
         auto id = message->chat->id;
-        std::cout<<"git /start message in chat "<<id<<"\n";
+        std::cout<<"got /start message in chat "<<id<<"\n";
         auto plr = wait_room.findPlayer(id);
         if(plr){
             std::cerr<<"double /start from "<<plr->get_nick()<<"\n";
@@ -123,6 +123,12 @@ public:
                 wait_room.removePlayer(plr);
                 room->addPlayer(plr);
                 writeTo(plr->get_id(),"welcome to room '"+room->get_id()+"'");
+                for(auto pl = room->begin(); pl != room->end(); pl++){
+                    if(pl == plr){
+                        continue;
+                    }
+                    writeTo(pl->get_id(),"Player @"+plr->get_nick()+" joined room");
+                }
             }else{
                 writeTo(plr->get_id(),"your pass '"+pass+"' is invalid");
             }
