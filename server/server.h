@@ -123,7 +123,8 @@ public:
                 wait_room.removePlayer(plr);
                 room->addPlayer(plr);
                 writeTo(plr->get_id(),"welcome to room '"+room->get_id()+"'");
-                for(auto pl = room->begin(); pl != room->end(); pl++){
+                for(auto pl_it = room->begin(); pl_it != room->end(); pl_it++){
+			auto pl = *pl_it;
                     if(pl == plr){
                         continue;
                     }
