@@ -67,11 +67,6 @@ public:
         std::cout<<"got /quit message in chat "<<id
             <<" from @"<<message->chat->username<<"\n";
         auto plr = wait_room.findPlayer(id);
-        if(plr){
-            wait_room.removePlayer(plr);
-            std::cout<<"user @"<<plr->get_nick()<<" exited waiting room\n";
-            return;
-        }
         for(auto r_it = rooms.begin(); r_it != rooms.end(); r_it++){
             auto &r = *r_it;
             plr = r->findPlayer(id);
@@ -84,10 +79,13 @@ public:
                 if(adm){
                     writeTo(adm->get_id(), ss.str());
                 }
+                writeTo(plr->get_id(), "you've successfully exited room "+r->get_id()+
+                    "\nrun cmd /join to enter new room or /help to list available commands");
                 if(r->size() == 0){
                     std::cout<<"deleting empty room "<<r->get_id()<<"\n";
                     rooms.erase(r_it);
                 }
+                wait_room.addPlayer(plr);
                 return;
             }
         }
