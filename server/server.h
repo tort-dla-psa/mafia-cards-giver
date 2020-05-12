@@ -66,21 +66,32 @@ public:
         auto id = message->chat->id;
         std::cout<<"got /quit message in chat "<<id
             <<" from @"<<message->chat->username<<"\n";
-        auto plr = wait_room.findPlayer(id);
+        std::shared_ptr<Player> plr;
         for(auto r_it = rooms.begin(); r_it != rooms.end(); r_it++){
             auto &r = *r_it;
             plr = r->findPlayer(id);
             if(plr){
                 std::stringstream ss;
-                ss<<"user @"<<plr->get_nick()<<" exited room "<<r->get_id()<<"\n";
-                std::cout<<ss.str();
-                r->removePlayer(plr);
+                ss<<"user @"<<plr->get_nick()<<" exited room "<<r->get_id();
+                std::cout<<ss.str()<<"\n";
+                r->removePlayer(plr); //remove exited player
                 auto adm = r->getAdmin();
                 if(adm){
+                    //send exited user info to room admin
                     writeTo(adm->get_id(), ss.str());
                 }
                 writeTo(plr->get_id(), "you've successfully exited room "+r->get_id()+
                     "\nrun cmd /join to enter new room or /help to list available commands");
+                if(std::dynamic_pointer_cast<Admin>(plr)){
+                    std::stringstream ss;
+                    ss<<"room host @"<<plr->get_nick()<<" exited room, now it'll be destroyed";
+                    for(auto &pl:*r){ //remove all players if admin exited
+                        writeTo(pl->get_id(), ss.str());
+                        writeTo(pl->get_id(), "you've successfully exited room "+r->get_id()+
+                            "\nrun cmd /join to enter new room or /help to list available commands");
+                        r->removePlayer(pl);
+                    }
+                }
                 if(r->size() == 0){
                     std::cout<<"deleting empty room "<<r->get_id()<<"\n";
                     rooms.erase(r_it);
@@ -99,7 +110,7 @@ public:
             <<"lovers\n"
             <<"mafias\n"
             <<"medics\n"
-            <<"killers\n";
+            <<"killers";
         writeTo(id, ss.str());
     }
 

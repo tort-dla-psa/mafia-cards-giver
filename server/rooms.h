@@ -128,8 +128,8 @@ class GameRoom:public Room{
             set.mafia_count = param;
         }else{
             std::stringstream ss;
-            ss<<"unknown cmd:"<<cmd<<"\n";
-            std::cerr<<ss.str();
+            ss<<"unknown cmd:"<<cmd;
+            std::cerr<<ss.str()<<"\n";
             write_to(adm->get_id(), ss.str());
         }
         auto sets_str = get_settings();
@@ -145,8 +145,8 @@ class GameRoom:public Room{
             if(count > players.size()-1){
                 std::stringstream ss;
                 ss<<"Error: you set category \""<<name<<"\"to be this large:"<<count
-                    <<"but there's only "<<players.size()-1<<" players\n";
-                std::cerr<<ss.str();
+                    <<"but there's only "<<players.size()-1<<" players";
+                std::cerr<<ss.str()<<"\n";;
                 write_to(adm->get_id(), ss.str());
             }
         };
