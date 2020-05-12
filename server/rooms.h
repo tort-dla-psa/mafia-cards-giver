@@ -1,15 +1,12 @@
 #pragma once
 #include "players.h"
 #include "roles.h"
-#include <QObject>
 #include <tgbot/tgbot.h>
-#include <QVector>
-#include <QString>
 #include <string>
 #include <vector>
 #include <memory>
 #include <iostream>
-#include <sstream>
+#include "helpers.h"
 
 struct settings{
     size_t mafia_count=0,
@@ -19,63 +16,83 @@ struct settings{
         killer_count=0;
 };
 
-class Room:public QObject{
-    Q_OBJECT
-protected:
-    QVector<Player*> players;
+class Room{
 public:
-    Room():QObject(){}
+    struct request{
+        virtual ~request(){}
+    };
+    struct write_request:request{
+        int id;
+        std::string mes;
+        write_request(int id, std::string mes):id(id),mes(mes),request(){}
+    };
+    struct join_request:request{
+        std::string id;
+        std::string pass;
+        join_request(std::string id, std::string pass):id(id),pass(pass),request(){}
+    };
+    struct create_request:request{
+        std::string pass;
+        create_request(std::string pass):pass(pass),request(){}
+    };
+protected:
+    std::vector<std::shared_ptr<Player>> players;
+    std::vector<std::shared_ptr<request>> reqs;
+    void write_to(int id, std::string mes){
+        std::shared_ptr<request> req = std::make_shared<write_request>(id, mes);
+        reqs.emplace_back(req);
+    }
+public:
+    Room(){}
     ~Room(){
-        for(auto &cl:players){
-            delete cl;
-        }
         players.clear();
     }
-    void addPlayer(Player* pl){
-        players.push_back(pl);
+    auto get_requests(){
+        return std::move(reqs);
     }
-    //Note:removes from container in Room
-    void removePlayer(Player* plr){
+    void addPlayer(std::shared_ptr<Player> pl){
+        players.emplace_back(pl);
+    }
+
+    void removePlayer(std::shared_ptr<Player> plr){
         if(!plr){
             return;
         }
-        players.removeAll(plr);
-        for(auto &plr_:players){
-            if(plr->get_id() == plr_->get_id()){
-                players.removeOne(plr_);
-            }
-        }
-        players.squeeze();
+        auto it = std::find(players.begin(), players.end(), plr);
+        players.erase(it);
     }
-    Player** findPlayer(int id){
-        return std::find_if(players.begin(), players.end(), 
+    std::shared_ptr<Player> findPlayer(int id){
+        auto it = std::find_if(players.begin(), players.end(), 
             [&id](const auto &pl){
                 return pl->get_id() == id;
             });
+        if(it == players.end()){
+            return nullptr;
+        }
+        return *it;
     }
-    Player** findPlayer(const std::string &nick){
-        return std::find_if(players.begin(), players.end(), 
+    std::shared_ptr<Player> findPlayer(const std::string &nick){
+        auto it = std::find_if(players.begin(), players.end(), 
             [&nick](const auto &pl){
                 return pl->get_nick() == nick;
             });
+        if(it == players.end()){
+            return nullptr;
+        }
+        return *it;
+    }
+    bool empty()const{
+        return size()==0;
+    }
+    size_t size()const{
+        return players.size();
     }
     virtual void processMessage(TgBot::Message::Ptr mes)=0;
-
-public slots:
-    virtual void onPlayerDisconnect(){
-        //TODO:fix
-        auto pl = nullptr;
-        players.removeOne(pl);
-    }
-signals:
-    void empty();
-    void writeTo(int id, std::string mes);
 };
 
 class GameRoom:public Room{
-    Q_OBJECT
     friend class Server;
-    Admin* adm;
+    std::shared_ptr<Admin> adm;
     std::string pass, id;
     const std::string set_sluts;
     const std::string set_cops;
@@ -87,12 +104,12 @@ class GameRoom:public Room{
     std::vector<std::unique_ptr<Role>> roles;
     settings set;
 
-    void check_settings_cmd(const QStringList &list){
+    void check_settings_cmd(const std::vector<std::string> &list){
         if(list.at(0) != "/set"){
             return;
         }
-        auto cmd = list.at(1).toStdString();
-        auto param = list.at(2).toUInt();
+        auto cmd = list.at(1);
+        auto param = std::stoi(list.at(2));
         if(cmd == set_cops){
             set.cops_count = param;
         }else if(cmd == set_sluts){
@@ -107,12 +124,12 @@ class GameRoom:public Room{
             std::stringstream ss;
             ss<<"unknown cmd:"<<cmd<<"\n";
             std::cerr<<ss.str();
-            emit writeTo(adm->get_id(), ss.str());
+            write_to(adm->get_id(), ss.str());
         }
         auto sets_str = get_settings();
         std::cout<<sets_str;
         std::cout.flush();
-        emit writeTo(adm->get_id(), sets_str);
+        write_to(adm->get_id(), sets_str);
     }
 
     void shuffle(){
@@ -124,7 +141,7 @@ class GameRoom:public Room{
                 ss<<"Error: you set category \""<<name<<"\"to be this large:"<<count
                     <<"but there's only "<<players.size()-1<<" players\n";
                 std::cerr<<ss.str();
-                emit writeTo(adm->get_id(), ss.str());
+                write_to(adm->get_id(), ss.str());
             }
         };
         for(int i = 0; i<set.cops_count; i++){
@@ -159,20 +176,20 @@ class GameRoom:public Room{
         auto role_it = roles.begin();
         for(int i=0; i<players.size(); i++){
             auto plr = players.at(i);
-            auto adm = dynamic_cast<Admin*>(plr);
+            auto adm = std::dynamic_pointer_cast<Admin>(plr);
             if(adm){
                 continue;
             }
             auto& role = *role_it;
             role_it++;
-            emit writeTo(plr->get_id(), std::to_string(role->get_id()));
+            write_to(plr->get_id(), std::to_string(role->get_id()));
             std::cout<<"Room "<<get_id()
                 <<": sent role "<<role->get_role_name()
                 <<"to "<<plr->get_nick()<<"\n";
         }
     }
 public:
-    GameRoom(Admin* adm,
+    GameRoom(std::shared_ptr<Admin> adm,
         const std::string &pass = "",
         const std::string &set_sluts="sluts",
         const std::string &set_cops="sheriffs",
@@ -195,23 +212,21 @@ public:
 
     void processMessage(TgBot::Message::Ptr tg_mes)override{
         std::string mes = tg_mes->text;
-        auto plr_it = findPlayer(tg_mes->chat->id);
-        if(!plr_it || !*plr_it){
+        auto plr = findPlayer(tg_mes->chat->id);
+        if(!plr){
             std::cerr<<"no user with id"<<tg_mes->chat->id<<" in room "+get_id()<<"\n";
             return;
         }
-        auto plr = *plr_it;
         std::cout<<"GameRoom id "<<get_id()<<":"
             <<"player "<<plr->get_nick()
             <<" wrote this:"<<mes<<"\n";
-        auto adm = dynamic_cast<Admin*>(plr);
+        auto adm = std::dynamic_pointer_cast<Admin>(plr);
         if(!adm){
             return;
         }else{
-            QString str = QString::fromStdString(mes);
-            auto list = str.split(' ');
+            auto list = helpers::split(mes);
             check_settings_cmd(list);
-            if(list.at(0).toStdString() == shuffle_cmd){
+            if(list.at(0) == shuffle_cmd){
                 auto sum = set.cops_count+
                     set.killer_count+
                     set.mafia_count+
@@ -221,7 +236,7 @@ public:
                     auto err_mes = "settings summ not equal to players count, "
                         +std::to_string(sum)+"!="+std::to_string(players.size()-1);
                     std::cerr<<err_mes<<"\n";
-                    emit writeTo(adm->get_id(), err_mes);
+                    write_to(adm->get_id(), err_mes);
                 }else{
                     shuffle();
                 }
@@ -243,24 +258,9 @@ public:
         ss<<"settings::killers = "<<set.killer_count<<"\n";
         return ss.str();
     }
-public slots:
-    void onPlayerDisconnect()override{
-        Room::onPlayerDisconnect();
-        auto pl = (Player*)sender();
-        auto adm_cast = dynamic_cast<Admin*>(pl);
-        if(adm_cast){
-            std::cout<<"admin disconnected!\n";
-            for(auto &cl:players){
-                delete cl;
-            }
-            players.clear();
-            emit empty();
-        }
-    }
 };
 
 class WaitingRoom:public Room{
-    Q_OBJECT
     const std::string start_cmd, join_cmd;
 public:
     WaitingRoom(const std::string start_cmd="/create",
@@ -270,43 +270,33 @@ public:
         join_cmd(join_cmd)
     {}
     void processMessage(TgBot::Message::Ptr tg_mes)override{
-        auto plr_it = findPlayer(tg_mes->chat->id);
-        if(!plr_it || !*plr_it){
+        auto plr = findPlayer(tg_mes->chat->id);
+        if(!plr){
             std::cerr<<"no user with id"<<tg_mes->chat->id<<" in waiting room \n";
             return;
         }
-        auto plr = *plr_it;
         std::string mes = tg_mes->text;
         std::cout<<"Waiting room:"<<plr->get_nick()
             <<" wrote this:"<<mes<<"\n";
-        QString str = QString::fromStdString(mes);
-        auto list = str.split(' ');
-        auto cmd_str = list.at(0).toStdString();
+        auto list = helpers::split(mes);
+        auto cmd_str = list.at(0);
         if(cmd_str == start_cmd){
             std::string pass;
             if(mes == start_cmd){
                 pass = "";
             }else{
-                pass = list.at(1).toStdString();
+                pass = list.at(1);
             }
-            emit roomCreateRequested(plr, pass);
+            std::shared_ptr<request> req = std::make_shared<create_request>(pass);
+            reqs.emplace_back(req);
         }else if(cmd_str == join_cmd){
             std::string pass = "";
             if(list.size() == 3){
-                pass = list.at(2).toStdString();
+                pass = list.at(2);
             }
-            auto id = list.at(1).toStdString();
-            emit roomJoinRequested(plr, id, pass);
+            auto id = list.at(1);
+            std::shared_ptr<request> req = std::make_shared<join_request>(id, pass);
+            reqs.emplace_back(req);
         }
     }
-public slots:
-    void onPlayerDisconnect()override{
-        Room::onPlayerDisconnect();
-        auto pl = dynamic_cast<Player*>(sender());
-        players.removeOne(pl);
-        delete pl;
-    }
-signals:
-    void roomCreateRequested(Player* plr, std::string pass);
-    void roomJoinRequested(Player* plr, std::string id, std::string pass);
 };

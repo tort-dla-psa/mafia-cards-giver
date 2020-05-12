@@ -1,9 +1,4 @@
 #pragma once
-#include <QVector>
-#include <QTcpSocket>
-#include <QTcpServer>
-#include <QObject>
-#include <QString>
 #include "players.h"
 #include "id_gen.h"
 #include "rooms.h"
@@ -13,64 +8,75 @@
 #include <iostream>
 #include <vector>
 
-class Server:public QObject{
-    Q_OBJECT
-
-    WaitingRoom* wait_room;
-    QVector<GameRoom*> rooms;
+class Server{
+    WaitingRoom wait_room;
+    std::vector<std::unique_ptr<GameRoom>> rooms;
 
     IdGenerator gen;
     const std::string key;
     std::unique_ptr<TgBot::Bot> bot;
     TgBot::CurlHttpClient curl;
+    void process_reqs(std::shared_ptr<Player> plr, const std::vector<std::shared_ptr<Room::request>> reqs){
+        for(auto &req:reqs){
+            auto write_cast = std::dynamic_pointer_cast<Room::write_request>(req);
+            if(write_cast){
+                writeTo(write_cast->id, write_cast->mes);
+                continue;
+            }
+            auto join_cast = std::dynamic_pointer_cast<Room::join_request>(req);
+            if(join_cast){
+                onRoomJoinRequested(plr, join_cast->id, join_cast->pass);
+                continue;
+            }
+            auto create_cast = std::dynamic_pointer_cast<Room::create_request>(req);
+            if(create_cast){
+                onRoomCreateRequested(plr, create_cast->pass);
+                continue;
+            }
+        }
+    }
 public:
-    Server(const std::string &key, QObject* parent=nullptr)
-        :QObject(parent),
-        key(key)
-    {
-        wait_room = new WaitingRoom();
-        connect(wait_room, &WaitingRoom::roomJoinRequested,
-            this, &Server::onRoomJoinRequested);
-        connect(wait_room, &WaitingRoom::roomCreateRequested,
-            this, &Server::onRoomCreateRequested);
-        connect(wait_room, &WaitingRoom::writeTo,
-            this, &Server::writeTo);
-    }
-    ~Server(){
-        delete wait_room;
-    }
-public slots:
+    Server(const std::string &key)
+        :key(key)
+    {}
+    ~Server(){}
+
     void onTgStartMessage(TgBot::Message::Ptr message){
         auto id = message->chat->id;
         std::cout<<"git /start message in chat "<<id<<"\n";
-        auto plr_it = wait_room->findPlayer(id);
-        if(plr_it && *plr_it){
-            std::cerr<<"double /start from "<<(*plr_it)->get_nick()<<"\n";
-            (*plr_it)->id = id;
+        auto plr = wait_room.findPlayer(id);
+        if(plr){
+            std::cerr<<"double /start from "<<plr->get_nick()<<"\n";
+            plr->id = id;
             return;
         }
-        for(auto r:rooms){
-            plr_it = r->findPlayer(id);
-            if(plr_it && *plr_it){
-                std::cerr<<"double /start from "<<(*plr_it)->get_nick()<<"\n";
-                (*plr_it)->id = id;
+        for(auto &r:rooms){
+            plr = r->findPlayer(id);
+            if(plr){
+                std::cerr<<"double /start from "<<plr->get_nick()<<"\n";
+                plr->id = id;
                 return;
             }
         }
-        auto plr = new Player(id, message->chat->username);
-        wait_room->addPlayer(plr);
+        plr = std::make_shared<Player>(id, message->chat->username);
+        wait_room.addPlayer(plr);
     }
+
     void onTgMessage(TgBot::Message::Ptr message){
         auto id = message->chat->id;
-        auto plr_it = wait_room->findPlayer(id);
-        if(plr_it && *plr_it){
-            wait_room->processMessage(message);
+        auto plr = wait_room.findPlayer(id);
+        if(plr){
+            wait_room.processMessage(message);
+            auto reqs = wait_room.get_requests();
+            process_reqs(plr, reqs);
             return;
         }
-        for(auto r:rooms){
-            plr_it = r->findPlayer(id);
-            if(plr_it && *plr_it){
+        for(auto &r:rooms){
+            plr = r->findPlayer(id);
+            if(plr){
                 r->processMessage(message);
+                auto reqs = r->get_requests();
+                process_reqs(plr, reqs);
                 return;
             }
         }
@@ -94,9 +100,9 @@ public slots:
             std::cout<<"ERROR: "<<e.what()<<std::endl;
         }
     }
-    void onRoomJoinRequested(Player* plr, std::string id, std::string pass){
+    void onRoomJoinRequested(std::shared_ptr<Player> plr, std::string id, std::string pass){
 	    std::cout<<"got join request, user:"<<plr->get_nick()<<" room:"<<id<<" pass:"<<pass<<"\n";
-        auto predicate = [&id](GameRoom* room){
+        auto predicate = [&id](const auto &room){
             if(room->get_id() == id){
                 return true;
             }else{
@@ -104,17 +110,17 @@ public slots:
             }
         };
         auto room_it = std::find_if(rooms.begin(), rooms.end(), predicate);
-        if(room_it == rooms.end() || !*room_it){
+        if(room_it == rooms.end()){
             writeTo(plr->get_id(), "there's no room with id "+id);
         }else{
-            auto room = *room_it;
+            auto &room = *room_it;
             if(room->get_pass() == pass){
-                auto plr_it = room->findPlayer(plr->get_id());
-                if(plr_it && *plr_it){
-                    writeTo(plr->get_id(),"you're allready in room '"+room->get_id()+"'");
+                auto plr_ = room->findPlayer(plr->get_id());
+                if(plr_){
+                    writeTo(plr_->get_id(),"you're allready in room '"+room->get_id()+"'");
                     return;
                 }
-                wait_room->removePlayer(plr);
+                wait_room.removePlayer(plr);
                 room->addPlayer(plr);
                 writeTo(plr->get_id(),"welcome to room '"+room->get_id()+"'");
             }else{
@@ -122,28 +128,22 @@ public slots:
             }
         }
     }
-    void onRoomCreateRequested(Player* plr, std::string pass){
-        wait_room->removePlayer(plr);
-        auto adm = new Admin(plr);
-        delete plr;
-
-        auto room = new GameRoom(adm, pass);
+    void onRoomCreateRequested(std::shared_ptr<Player> plr, std::string pass){
+        wait_room.removePlayer(plr);
+        auto adm = std::make_shared<Admin>(plr);
+        auto room = std::make_unique<GameRoom>(adm, pass);
         room->id = gen.get_id();
-        connect(room, &GameRoom::writeTo,
-            this, &Server::writeTo);
         std::cout<<"new room, id:"<<room->get_id()
             <<" pass:"<<room->get_pass()<<"\n";
         writeTo(adm->get_id(), "your room id: "+room->get_id()+
             " pass:"+room->get_pass()); 
-        connect(room, &Room::empty,
-            this, &Server::onRoomEmpty);
-        rooms.push_back(room);
+        rooms.emplace_back(std::move(room));
     }
-    void onRoomEmpty(){
-        auto room = (GameRoom*)sender();
-        rooms.removeOne(room);
+    template<class It>
+    void onRoomEmpty(It room_it){
+        auto &room = *room_it;
+        rooms.erase(room_it);
         std::cout<<"room id:"<<room->get_id()<<" is empty now\n";
-        delete room;
     }
     void writeTo(int id, std::string mes){
         try{
@@ -152,6 +152,4 @@ public slots:
             std::cout<<"ERROR: "<<e.what()<<std::endl;
         }
     }
-signals:
-    void finished();
 };

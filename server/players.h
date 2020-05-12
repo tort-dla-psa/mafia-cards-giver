@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <memory>
 
 class Player{
 protected:
@@ -27,7 +28,7 @@ public:
         :Player(id, username)
     {}
 
-    Admin(Player* plr)
+    Admin(std::shared_ptr<Player> plr)
         :Player(plr->id, plr->username)
     {}
 };
