@@ -62,6 +62,18 @@ public:
         wait_room.addPlayer(plr);
     }
 
+    void onTgHelpMessage(TgBot::Message::Ptr message){
+        auto id = message->chat->id;
+        auto mes = "Welcome to mafia bot! I support this commands:\n"
+            "/create - make room\n"
+            "/create 1 - make room with password \"1\"\n"
+            "/join abcdef - join room with id \"abcdef\"\n"
+            "/join abcdef 1 - join room with id \"abcdef\" and pass 1\n"
+            "/shuffle - command for admin to give roles\n"
+            "/help - this message";
+        writeTo(id, mes);
+    }
+
     void onTgMessage(TgBot::Message::Ptr message){
         auto id = message->chat->id;
         auto plr = wait_room.findPlayer(id);
@@ -87,6 +99,8 @@ public:
             [this](TgBot::Message::Ptr message) {
                 if(message->text == "/start"){
                     onTgStartMessage(message);
+                }else if(message->text == "/help"){
+                    onTgHelpMessage(message);
                 }else{
                     onTgMessage(message);
                 }
