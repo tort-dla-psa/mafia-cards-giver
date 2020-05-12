@@ -148,7 +148,7 @@ class GameRoom:public Room{
             if(count > players.size()-1){
                 std::stringstream ss;
                 ss<<"Error: you set category \""<<name<<"\"to be this large:"<<count
-                    <<"but there's only "<<players.size()-1<<" players";
+                    <<"but there're only "<<players.size()-1<<" players";
                 std::cerr<<ss.str()<<"\n";;
                 write_to(adm->get_id(), ss.str());
             }
@@ -251,7 +251,7 @@ public:
                     set.medic_count+
                     set.lover_count;
                 if(sum > players.size()-1){
-                    auto err_mes = "settings summ not equal to players count, "
+                    auto err_mes = "settings sum is not equal to players count, "
                         +std::to_string(sum)+"!="+std::to_string(players.size()-1);
                     std::cerr<<err_mes<<"\n";
                     write_to(adm->get_id(), err_mes);
