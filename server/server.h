@@ -86,11 +86,13 @@ public:
                 }else{ //exited user is admin
                     std::stringstream ss;
                     ss<<"room host @"<<plr->get_nick()<<" exited room, now it'll be destroyed";
-                    for(auto &pl:*r){ //remove all players if admin exited
+                    auto pl_it = r->begin();
+                    while(pl_it!=r->end()){
+                        auto pl = *pl_it;
                         writeTo(pl->get_id(), ss.str());
                         writeTo(pl->get_id(), "you've successfully exited room "+r->get_id()+
                             "\nrun cmd /join to enter new room or /help to list available commands");
-                        r->removePlayer(pl); //remove player
+                        pl_it = r->removePlayer(pl_it); //remove player
                         wait_room.addPlayer(pl); //add him to waiting room
                     }
                 }

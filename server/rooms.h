@@ -60,6 +60,9 @@ public:
         players.emplace_back(pl);
     }
 
+    auto removePlayer(decltype(players)::iterator it){
+        return players.erase(it);
+    }
     void removePlayer(std::shared_ptr<Player> plr){
         if(!plr){
             return;
