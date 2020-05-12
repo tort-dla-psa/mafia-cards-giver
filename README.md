@@ -20,8 +20,11 @@ sudo apt install g++ make binutils cmake libssl-dev libboost-system-dev zlib1g-d
 ```
 
 # running
->./server_exec [api_key]
-
+```bash
+./server_exec [api_key] #regular run
+./server_exec [api_key] > log 2>&1 & #daemonize and save logs
+demonize -o log -e log_err %(pwd)/server_run [api_key] #or like this
+```
 
 # commands
 ```
@@ -31,6 +34,10 @@ sudo apt install g++ make binutils cmake libssl-dev libboost-system-dev zlib1g-d
 /join abcdef - join room with id "abcdef"
 /join abcdef 1 - join room with id "abcdef" and pass 1
 /shuffle - command for admin to give roles
+/set [role] [num] - set quantity of a role to given number
+/roles - print out roles
+/quit - exit room
+/help - this message
 ```
 
 # todo
