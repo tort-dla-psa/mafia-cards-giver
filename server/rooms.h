@@ -117,6 +117,10 @@ class GameRoom:public Room{
         if(list.at(0) != "/set"){
             return;
         }
+        if(list.size()!=3){
+            write_to(adm->get_id(), "Usage: /set [role] [num]");
+            return;
+        }
         auto cmd = list.at(1);
         auto param = std::stoi(list.at(2));
         if(cmd == set_cops){
@@ -131,9 +135,10 @@ class GameRoom:public Room{
             set.mafia_count = param;
         }else{
             std::stringstream ss;
-            ss<<"unknown cmd:"<<cmd;
+            ss<<"Unknown cmd:"<<cmd;
             std::cerr<<ss.str()<<"\n";
             write_to(adm->get_id(), ss.str());
+            return;
         }
         auto sets_str = get_settings();
         std::cout<<sets_str;
@@ -144,37 +149,49 @@ class GameRoom:public Room{
     void shuffle(){
         roles.clear();
         size_t citizen_count = players.size()-1; //without admin
-        auto check_mes = [this](const std::string &name, const size_t &count){
+        auto check_mes = [this](const std::string &name, const size_t &count)->bool{
             if(count > players.size()-1){
                 std::stringstream ss;
                 ss<<"Error: you set category \""<<name<<"\"to be this large:"<<count
                     <<"but there're only "<<players.size()-1<<" players";
                 std::cerr<<ss.str()<<"\n";;
                 write_to(adm->get_id(), ss.str());
+                return false;
             }
+            return true;
         };
         for(int i = 0; i<set.cops_count; i++){
-            check_mes("cop", set.cops_count);
+            if(check_mes("cop", set.cops_count)){
+                return;
+            }
             roles.emplace_back(std::make_unique<Cop>());
             citizen_count--;
         }
         for(int i = 0; i<set.killer_count; i++){
-            check_mes("killer", set.killer_count);
+            if(check_mes("killer", set.killer_count)){
+                return;
+            }
             roles.emplace_back(std::make_unique<Killer>());
             citizen_count--;
         }
         for(int i = 0; i<set.medic_count; i++){
-            check_mes("medic", set.medic_count);
+            if(check_mes("medic", set.medic_count)){
+                return;
+            }
             roles.emplace_back(std::make_unique<Medic>());
             citizen_count--;
         }
         for(int i = 0; i<set.lover_count; i++){
-            check_mes("lover", set.lover_count);
+            if(check_mes("lover", set.lover_count)){
+                return;
+            }
             roles.emplace_back(std::make_unique<lover>());
             citizen_count--;
         }
         for(int i = 0; i<set.mafia_count; i++){
-            check_mes("mafia", set.mafia_count);
+            if(check_mes("mafia", set.mafia_count)){
+                return;
+            }
             roles.emplace_back(std::make_unique<Mafia>());
             citizen_count--;
         }
@@ -297,13 +314,17 @@ public:
         std::cout<<"Waiting room:"<<plr->get_nick()
             <<" wrote this:"<<mes<<"\n";
         auto list = helpers::split(mes);
+        if(list.size()==0){
+            return;
+        }
         auto cmd_str = list.at(0);
         if(cmd_str == start_cmd){
-            std::string pass;
-            if(mes == start_cmd){
-                pass = "";
-            }else{
+            std::string pass = "";
+            if(list.size() == 2){
                 pass = list.at(1);
+            }else if(list.size() != 1){
+                write_to(tg_mes->chat->id, "Usage: /create [pass(optional)]");
+                return;
             }
             std::shared_ptr<request> req = std::make_shared<create_request>(pass);
             reqs.emplace_back(req);
@@ -311,6 +332,9 @@ public:
             std::string pass = "";
             if(list.size() == 3){
                 pass = list.at(2);
+            }else if(list.size() > 3){
+                write_to(tg_mes->chat->id, "Usage: /join [id] [pass(optional)]");
+                return;
             }
             auto id = list.at(1);
             std::shared_ptr<request> req = std::make_shared<join_request>(id, pass);
