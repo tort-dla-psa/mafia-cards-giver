@@ -76,7 +76,6 @@ public:
                 ss<<"user @"<<plr->get_nick()<<" exited room "<<r->get_id();
                 std::cout<<ss.str()<<"\n";
                 r->removePlayer(plr); //remove exited player
-                wait_room.addPlayer(plr); //add him to waiting room
                 writeTo(plr->get_id(), "you've successfully exited room "+r->get_id()+
                     "\nrun cmd /join to enter new room or /help to list available commands");
                 auto adm = r->getAdmin();
@@ -84,6 +83,7 @@ public:
                     //send exited user info to room admin
                     writeTo(adm->get_id(), ss.str());
                 }else{ //exited user is admin
+                    plr = std::make_shared<Player>(adm->get_id(), adm->get_nick());
                     std::stringstream ss;
                     ss<<"room host @"<<plr->get_nick()<<" exited room, now it'll be destroyed";
                     auto pl_it = r->begin();
@@ -96,6 +96,7 @@ public:
                         wait_room.addPlayer(pl); //add him to waiting room
                     }
                 }
+                wait_room.addPlayer(plr); //add him to waiting room
                 if(r->size() == 0){
                     std::cout<<"deleting empty room "<<r->get_id()<<"\n";
                     r_it = rooms.erase(r_it);
@@ -213,7 +214,7 @@ public:
     }
     void onRoomCreateRequested(std::shared_ptr<Player> plr, std::string pass){
         wait_room.removePlayer(plr);
-        auto adm = std::make_shared<Admin>(plr);
+        auto adm = std::make_shared<Admin>(plr->get_id(), plr->get_nick());
         auto room = std::make_unique<GameRoom>(adm, pass);
         room->id = gen.get_id();
         std::cout<<"new room, id:"<<room->get_id()

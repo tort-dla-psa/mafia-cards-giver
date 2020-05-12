@@ -27,8 +27,4 @@ public:
     Admin(const int id, const std::string &username)
         :Player(id, username)
     {}
-
-    Admin(std::shared_ptr<Player> plr)
-        :Player(plr->id, plr->username)
-    {}
 };
