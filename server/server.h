@@ -95,7 +95,7 @@ public:
         auto id = message->chat->id;
         std::stringstream ss;
         ss<<"Available roles:\n"
-            <<"cops\n"
+            <<"\ncops\n"
             <<"lovers\n"
             <<"mafias\n"
             <<"medics\n"
@@ -105,13 +105,13 @@ public:
 
     void onTgHelpMessage(TgBot::Message::Ptr message){
         auto id = message->chat->id;
-        auto mes = "Welcome to mafia bot! I support this commands:\n"
+        auto mes = "Welcome to mafia bot! I support these commands:\n"
             "/create - make room\n"
             "/create 1 - make room with password \"1\"\n"
             "/join abcdef - join room with id \"abcdef\"\n"
             "/join abcdef 1 - join room with id \"abcdef\" and pass 1\n"
             "/shuffle - command for admin to give roles\n"
-            "/set [role] [num] - set quantity of some role to given number\n"
+            "/set [role] [num] - set quantity of a role to given number\n"
             "/roles - print out roles\n"
             "/quit - exit room\n"
             "/help - this message";
@@ -190,7 +190,7 @@ public:
                     if(pl == plr){
                         continue;
                     }
-                    writeTo(pl->get_id(),"Player @"+plr->get_nick()+" joined room");
+                    writeTo(pl->get_id(),"player @"+plr->get_nick()+" joined room");
                 }
             }else{
                 writeTo(plr->get_id(),"your pass '"+pass+"' is invalid");
@@ -207,8 +207,8 @@ public:
         std::stringstream ss;
         ss << "your room id: " << room->get_id()
             << " pass:"+room->get_pass()
-            << " \nNow run command /set [role] [num] to change settings, or all players will be citizens.\n"
-            << " resend next message to your friends.";
+            << " \n\nnow run command /set [role] [num] to change settings, otherwise all the players will be citizens.\n"
+            << "resend the message below to your friends:";
         writeTo(adm->get_id(), ss.str());
         writeTo(adm->get_id(), "/join " + room->get_id() +" "+room->get_pass());
         rooms.emplace_back(std::move(room));
