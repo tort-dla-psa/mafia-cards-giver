@@ -62,6 +62,49 @@ public:
         wait_room.addPlayer(plr);
     }
 
+    void onTgQuitMessage(TgBot::Message::Ptr message){
+        auto id = message->chat->id;
+        std::cout<<"got /quit message in chat "<<id
+            <<" from @"<<message->chat->username<<"\n";
+        auto plr = wait_room.findPlayer(id);
+        if(plr){
+            wait_room.removePlayer(plr);
+            std::cout<<"user @"<<plr->get_nick()<<" exited waiting room\n";
+            return;
+        }
+        for(auto r_it = rooms.begin(); r_it != rooms.end(); r_it++){
+            auto &r = *r_it;
+            plr = r->findPlayer(id);
+            if(plr){
+                std::stringstream ss;
+                ss<<"user @"<<plr->get_nick()<<" exited room "<<r->get_id()<<"\n";
+                std::cout<<ss.str();
+                r->removePlayer(plr);
+                auto adm = r->getAdmin();
+                if(adm){
+                    writeTo(adm->get_id(), ss.str());
+                }
+                if(r->size() == 0){
+                    std::cout<<"deleting empty room "<<r->get_id()<<"\n";
+                    rooms.erase(r_it);
+                }
+                return;
+            }
+        }
+    }
+
+    void onTgRolesMessage(TgBot::Message::Ptr message){
+        auto id = message->chat->id;
+        std::stringstream ss;
+        ss<<"Available roles:\n"
+            <<"cops\n"
+            <<"lovers\n"
+            <<"mafias\n"
+            <<"medics\n"
+            <<"killers\n";
+        writeTo(id, ss.str());
+    }
+
     void onTgHelpMessage(TgBot::Message::Ptr message){
         auto id = message->chat->id;
         auto mes = "Welcome to mafia bot! I support this commands:\n"
@@ -70,6 +113,9 @@ public:
             "/join abcdef - join room with id \"abcdef\"\n"
             "/join abcdef 1 - join room with id \"abcdef\" and pass 1\n"
             "/shuffle - command for admin to give roles\n"
+            "/set [role] [num] - set quantity of some role to given number\n"
+            "/roles - print out roles\n"
+            "/quit - exit room\n"
             "/help - this message";
         writeTo(id, mes);
     }
@@ -97,9 +143,13 @@ public:
         bot = std::make_unique<TgBot::Bot>(key, curl);
         bot->getEvents().onAnyMessage(
             [this](TgBot::Message::Ptr message) {
-                if(message->text == "/start"){
+                if(message->text.find("/start") != std::string::npos){
                     onTgStartMessage(message);
-                }else if(message->text == "/help"){
+                }else if(message->text.find("/quit") != std::string::npos){
+                    onTgQuitMessage(message);
+                }else if(message->text.find("/roles") != std::string::npos){
+                    onTgRolesMessage(message);
+                }else if(message->text.find("/help") != std::string::npos){
                     onTgHelpMessage(message);
                 }else{
                     onTgMessage(message);
@@ -156,8 +206,13 @@ public:
         room->id = gen.get_id();
         std::cout<<"new room, id:"<<room->get_id()
             <<" pass:"<<room->get_pass()<<"\n";
-        writeTo(adm->get_id(), "your room id: "+room->get_id()+
-            " pass:"+room->get_pass()); 
+        std::stringstream ss;
+        ss << "your room id: " << room->get_id()
+            << " pass:"+room->get_pass()
+            << " \nNow run command /set [role] [num] to change settings, or all players will be citizens.\n"
+            << " resend next message to your friends.";
+        writeTo(adm->get_id(), ss.str());
+        writeTo(adm->get_id(), "/join " + room->get_id() +" "+room->get_pass());
         rooms.emplace_back(std::move(room));
     }
     template<class It>

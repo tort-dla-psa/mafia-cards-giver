@@ -30,20 +30,20 @@ public:
     Medic():Role(2){};
     std::string get_role_name()override{ return "medic"; }
 };
-class Slut:public Role{
+class lover:public Role{
 public:
-    Slut():Role(3){};
-    std::string get_role_name()override{ return "slut"; }
+    lover():Role(3){};
+    std::string get_role_name()override{ return "lover"; }
 };
 class Killer:public Role{
 public:
     Killer():Role(4){};
     std::string get_role_name()override{ return "killer"; }
 };
-class Sheriff:public Role{
+class Cop:public Role{
 public:
-    Sheriff():Role(5){};
-    std::string get_role_name()override{ return "sheriff"; }
+    Cop():Role(5){};
+    std::string get_role_name()override{ return "cop"; }
 };
 class Converter{
 public:
@@ -55,11 +55,11 @@ public:
         }else if(id == 2){
             return std::make_unique<Medic>();
         }else if(id == 3){
-            return std::make_unique<Slut>();
+            return std::make_unique<lover>();
         }else if(id == 4){
             return std::make_unique<Killer>();
         }else if(id == 5){
-            return std::make_unique<Sheriff>();
+            return std::make_unique<Cop>();
         }
         throw std::runtime_error("unknown id to convert");
     }

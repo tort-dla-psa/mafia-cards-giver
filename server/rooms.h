@@ -12,7 +12,7 @@ struct settings{
     size_t mafia_count=0,
         medic_count=0,
         cops_count=0,
-        slut_count=0,
+        lover_count=0,
         killer_count=0;
 };
 
@@ -100,7 +100,7 @@ class GameRoom:public Room{
     friend class Server;
     std::shared_ptr<Admin> adm;
     std::string pass, id;
-    const std::string set_sluts;
+    const std::string set_lovers;
     const std::string set_cops;
     const std::string set_killers;
     const std::string set_mafias;
@@ -118,8 +118,8 @@ class GameRoom:public Room{
         auto param = std::stoi(list.at(2));
         if(cmd == set_cops){
             set.cops_count = param;
-        }else if(cmd == set_sluts){
-            set.slut_count = param;
+        }else if(cmd == set_lovers){
+            set.lover_count = param;
         }else if(cmd == set_medics){
             set.medic_count = param;
         }else if(cmd == set_killers){
@@ -151,8 +151,8 @@ class GameRoom:public Room{
             }
         };
         for(int i = 0; i<set.cops_count; i++){
-            check_mes("sheriff", set.cops_count);
-            roles.emplace_back(std::make_unique<Sheriff>());
+            check_mes("cop", set.cops_count);
+            roles.emplace_back(std::make_unique<Cop>());
             citizen_count--;
         }
         for(int i = 0; i<set.killer_count; i++){
@@ -165,9 +165,9 @@ class GameRoom:public Room{
             roles.emplace_back(std::make_unique<Medic>());
             citizen_count--;
         }
-        for(int i = 0; i<set.slut_count; i++){
-            check_mes("slut", set.slut_count);
-            roles.emplace_back(std::make_unique<Slut>());
+        for(int i = 0; i<set.lover_count; i++){
+            check_mes("lover", set.lover_count);
+            roles.emplace_back(std::make_unique<lover>());
             citizen_count--;
         }
         for(int i = 0; i<set.mafia_count; i++){
@@ -202,14 +202,14 @@ class GameRoom:public Room{
 public:
     GameRoom(std::shared_ptr<Admin> adm,
         const std::string &pass = "",
-        const std::string &set_sluts="sluts",
-        const std::string &set_cops="sheriffs",
+        const std::string &set_lovers="lovers",
+        const std::string &set_cops="cops",
         const std::string &set_killers="killers",
         const std::string &set_mafias="mafias",
         const std::string &set_medics="medics",
         const std::string &shuffle_cmd="/shuffle")
         :Room(),
-        set_sluts(set_sluts),
+        set_lovers(set_lovers),
         set_cops(set_cops),
         set_killers(set_killers),
         set_mafias(set_mafias),
@@ -219,6 +219,10 @@ public:
         this->adm = adm;
         Room::addPlayer(adm);
         this->pass = pass;
+    }
+
+    std::shared_ptr<Admin> getAdmin()const{
+        return adm;
     }
 
     void processMessage(TgBot::Message::Ptr tg_mes)override{
@@ -242,7 +246,7 @@ public:
                     set.killer_count+
                     set.mafia_count+
                     set.medic_count+
-                    set.slut_count;
+                    set.lover_count;
                 if(sum > players.size()-1){
                     auto err_mes = "settings summ not equal to players count, "
                         +std::to_string(sum)+"!="+std::to_string(players.size()-1);
@@ -264,7 +268,7 @@ public:
         std::stringstream ss;
         ss<<"settings::cops = "<<set.cops_count<<"\n";
         ss<<"settings::medics = "<<set.medic_count<<"\n";
-        ss<<"settings::sluts = "<<set.slut_count<<"\n";
+        ss<<"settings::lovers = "<<set.lover_count<<"\n";
         ss<<"settings::mafias = "<<set.mafia_count<<"\n";
         ss<<"settings::killers = "<<set.killer_count<<"\n";
         return ss.str();
