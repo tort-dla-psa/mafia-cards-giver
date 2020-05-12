@@ -69,34 +69,35 @@ public:
         std::shared_ptr<Player> plr;
         for(auto r_it = rooms.begin(); r_it != rooms.end(); r_it++){
             auto &r = *r_it;
+            //find player and room where event happened
             plr = r->findPlayer(id);
             if(plr){
                 std::stringstream ss;
                 ss<<"user @"<<plr->get_nick()<<" exited room "<<r->get_id();
                 std::cout<<ss.str()<<"\n";
                 r->removePlayer(plr); //remove exited player
-                auto adm = r->getAdmin();
-                if(adm){
-                    //send exited user info to room admin
-                    writeTo(adm->get_id(), ss.str());
-                }
+                wait_room.addPlayer(plr); //add him to waiting room
                 writeTo(plr->get_id(), "you've successfully exited room "+r->get_id()+
                     "\nrun cmd /join to enter new room or /help to list available commands");
-                if(std::dynamic_pointer_cast<Admin>(plr)){
+                auto adm = r->getAdmin();
+                if(adm->get_id() != plr->get_id()){ //exited user is not admin
+                    //send exited user info to room admin
+                    writeTo(adm->get_id(), ss.str());
+                }else{ //exited user is admin
                     std::stringstream ss;
                     ss<<"room host @"<<plr->get_nick()<<" exited room, now it'll be destroyed";
                     for(auto &pl:*r){ //remove all players if admin exited
                         writeTo(pl->get_id(), ss.str());
                         writeTo(pl->get_id(), "you've successfully exited room "+r->get_id()+
                             "\nrun cmd /join to enter new room or /help to list available commands");
-                        r->removePlayer(pl);
+                        r->removePlayer(pl); //remove player
+                        wait_room.addPlayer(pl); //add him to waiting room
                     }
                 }
                 if(r->size() == 0){
                     std::cout<<"deleting empty room "<<r->get_id()<<"\n";
-                    rooms.erase(r_it);
+                    r_it = rooms.erase(r_it);
                 }
-                wait_room.addPlayer(plr);
                 return;
             }
         }
