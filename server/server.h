@@ -128,18 +128,6 @@ public:
             <<"medics\n"
             <<"killers";
         writeTo(id, ss.str());
-        ss.clear();
-        ss<<"waiting room:\n";
-        for(const auto &pl:wait_room){
-            ss<<pl->get_nick()<<":"<<pl->get_id()<<"\n";
-        }
-        for(const auto &r_ptr:rooms){
-            const auto &r = *r_ptr;
-            ss<<"\nRoom "<<r.get_id()<<"\n";
-            for(const auto &pl:r){
-                ss<<pl->get_nick()<<":"<<pl->get_id()<<"\n";
-            }
-        }
     }
 
     void onTgHelpMessage(TgBot::Message::Ptr message){
@@ -155,6 +143,19 @@ public:
             "/quit - exit room\n"
             "/help - this message";
         writeTo(id, mes);
+        std::stringstream ss;
+        ss<<"waiting room:\n";
+        for(const auto &pl:wait_room){
+            ss<<pl->get_nick()<<":"<<pl->get_id()<<"\n";
+        }
+        for(const auto &r_ptr:rooms){
+            const auto &r = *r_ptr;
+            ss<<"\nRoom "<<r.get_id()<<"\n";
+            for(const auto &pl:r){
+                ss<<pl->get_nick()<<":"<<pl->get_id()<<"\n";
+            }
+        }
+        std::cout<<ss.str()<<"\n";
     }
 
     void onTgMessage(TgBot::Message::Ptr message){
