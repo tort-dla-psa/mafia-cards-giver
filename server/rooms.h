@@ -156,9 +156,9 @@ class GameRoom:public Room{
                     <<"but there're only "<<players.size()-1<<" players";
                 std::cerr<<ss.str()<<"\n";;
                 write_to(adm->get_id(), ss.str());
-                return false;
+                return true;
             }
-            return true;
+            return false;
         };
         for(int i = 0; i<set.cops_count; i++){
             if(check_mes("cop", set.cops_count)){
