@@ -146,6 +146,7 @@ class GameRoom:public Room{
     }
 
     void shuffle(){
+        std::cout<<"shuffling roles in room "<<get_id()<<"\n";
         roles.clear();
         size_t citizen_count = players.size()-1; //without admin
         auto check_mes = [this](const std::string &name, const size_t &count)->bool{
@@ -202,8 +203,7 @@ class GameRoom:public Room{
         std::stringstream roles_for_adm;
         for(int i=0; i<players.size(); i++){
             auto plr = players.at(i);
-            auto adm = std::dynamic_pointer_cast<Admin>(plr);
-            if(adm){
+            if(plr->get_id() == adm->get_id()){
                 continue;
             }
             auto& role = *role_it;
