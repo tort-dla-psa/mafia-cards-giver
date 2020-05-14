@@ -48,6 +48,7 @@ public:
         if(plr){
             std::cerr<<"double /start from "<<plr->get_nick()<<"\n";
             plr->id = id;
+            writeTo(plr->id, "You are allready in waiting room");
             return;
         }
         for(auto &r:rooms){
@@ -55,6 +56,7 @@ public:
             if(plr){
                 std::cerr<<"double /start from "<<plr->get_nick()<<"\n";
                 plr->id = id;
+                writeTo(plr->id, "You are allready in waiting room");
                 return;
             }
         }
@@ -67,42 +69,52 @@ public:
         std::cout<<"got /quit message in chat "<<id
             <<" from @"<<message->chat->username<<"\n";
         std::shared_ptr<Player> plr;
+        {
+            auto wait_ptr = wait_room.findPlayer(id);
+            if(wait_ptr){
+                std::string mes = "You are allready in waining room";
+                writeTo(id, mes);
+                return;
+            }
+        }
         for(auto r_it = rooms.begin(); r_it != rooms.end(); r_it++){
             auto &r = *r_it;
             //find player and room where event happened
             plr = r->findPlayer(id);
-            if(plr){
-                std::stringstream ss;
-                ss<<"user @"<<plr->get_nick()<<" exited room "<<r->get_id();
-                std::cout<<ss.str()<<"\n";
+            if(!plr){
+                continue;
+            }
+            std::stringstream ss;
+            ss<<"User @"<<plr->get_nick()<<" exited room "<<r->get_id();
+            std::cout<<ss.str()<<"\n";
+            auto adm = r->getAdmin();
+            if(adm->get_id() != plr->get_id()){ //exited user is not admin
+                //send exited user info to room admin
                 r->removePlayer(plr); //remove exited player
                 writeTo(plr->get_id(), "you've successfully exited room "+r->get_id()+
-                    "\nrun cmd /join to enter new room or /help to list available commands");
-                auto adm = r->getAdmin();
-                if(adm->get_id() != plr->get_id()){ //exited user is not admin
-                    //send exited user info to room admin
-                    writeTo(adm->get_id(), ss.str());
-                }else{ //exited user is admin
-                    plr = std::make_shared<Player>(adm->get_id(), adm->get_nick());
-                    std::stringstream ss;
-                    ss<<"room host @"<<plr->get_nick()<<" exited room, now it'll be destroyed";
-                    auto pl_it = r->begin();
-                    while(pl_it!=r->end()){
-                        auto pl = *pl_it;
-                        writeTo(pl->get_id(), ss.str());
-                        writeTo(pl->get_id(), "you've successfully exited room "+r->get_id()+
-                            "\nrun cmd /join to enter new room or /help to list available commands");
-                        pl_it = r->removePlayer(pl_it); //remove player
-                        wait_room.addPlayer(pl); //add him to waiting room
-                    }
+                    "\nrun cmd /join to enter another room or /help to list available commands");
+                writeTo(adm->get_id(), ss.str());
+            }else{ //exited user is admin
+                r->removePlayer(plr); //remove exited player
+                plr = std::make_shared<Player>(adm->get_id(), adm->get_nick());
+                r->adm = nullptr;
+                std::string mes = "room host @"+plr->get_nick()+" exited room, now it'll be destroyed";
+                auto pl_it = r->begin();
+                while(pl_it!=r->end()){
+                    auto pl = *pl_it;
+                    writeTo(pl->get_id(), mes);
+                    writeTo(pl->get_id(), "you've successfully exited room "+r->get_id()+
+                        "\nrun cmd /join to enter new room or /help to list available commands");
+                    pl_it = r->removePlayer(pl_it); //remove player
+                    wait_room.addPlayer(pl); //add him to waiting room
                 }
-                wait_room.addPlayer(plr); //add him to waiting room
-                if(r->size() == 0){
-                    std::cout<<"deleting empty room "<<r->get_id()<<"\n";
-                    r_it = rooms.erase(r_it);
-                }
-                return;
             }
+            wait_room.addPlayer(plr); //add him to waiting room
+            if(r->size() == 0){
+                std::cout<<"deleting empty room "<<r->get_id()<<"\n";
+                r_it = rooms.erase(r_it);
+            }
+            return;
         }
     }
 
@@ -188,27 +200,22 @@ public:
         };
         auto room_it = std::find_if(rooms.begin(), rooms.end(), predicate);
         if(room_it == rooms.end()){
-            writeTo(plr->get_id(), "there's no room with id "+id);
+            writeTo(plr->get_id(), "There's no room with id "+id);
         }else{
             auto &room = *room_it;
             if(room->get_pass() == pass){
                 auto plr_ = room->findPlayer(plr->get_id());
                 if(plr_){
-                    writeTo(plr_->get_id(),"you're allready in room '"+room->get_id()+"'");
+                    writeTo(plr_->get_id(),"You're allready in room '"+room->get_id()+"'");
                     return;
                 }
                 wait_room.removePlayer(plr);
                 room->addPlayer(plr);
-                writeTo(plr->get_id(),"welcome to room '"+room->get_id()+"'");
-                for(auto pl_it = room->begin(); pl_it != room->end(); pl_it++){
-			auto pl = *pl_it;
-                    if(pl == plr){
-                        continue;
-                    }
-                    writeTo(pl->get_id(),"player @"+plr->get_nick()+" joined room");
-                }
+                auto mes = "Welcome to room '"+room->get_id()+"'.\
+                    Now wait while admin will give you a role.";
+                writeTo(plr->get_id(), mes);
             }else{
-                writeTo(plr->get_id(),"your pass '"+pass+"' is invalid");
+                writeTo(plr->get_id(),"Your pass '"+pass+"' is invalid");
             }
         }
     }
@@ -220,10 +227,10 @@ public:
         std::cout<<"new room, id:"<<room->get_id()
             <<" pass:"<<room->get_pass()<<"\n";
         std::stringstream ss;
-        ss << "your room id: " << room->get_id()
-            << " pass:"+room->get_pass()
-            << " \n\nnow run command /set [role] [num] to change settings, otherwise all the players will be citizens.\n"
-            << "resend the message below to your friends:";
+        ss << "Your room id: " << room->get_id()
+            << " pass:"+room->get_pass() << "\n\n"
+            << "Now run command /set [role] [num] to change settings, otherwise all the players will be citizens.\n"
+            << "Resend the message below to your friends:";
         writeTo(adm->get_id(), ss.str());
         writeTo(adm->get_id(), "/join " + room->get_id() +" "+room->get_pass());
         rooms.emplace_back(std::move(room));
@@ -232,7 +239,7 @@ public:
     void onRoomEmpty(It room_it){
         auto &room = *room_it;
         rooms.erase(room_it);
-        std::cout<<"room id:"<<room->get_id()<<" is empty now\n";
+        std::cout<<"Room id:"<<room->get_id()<<" is empty now\n";
     }
     void writeTo(int id, std::string mes){
         try{

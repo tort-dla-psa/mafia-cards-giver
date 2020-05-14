@@ -252,13 +252,15 @@ public:
             std::cerr<<"no user with id"<<tg_mes->chat->id<<" in room "+get_id()<<"\n";
             return;
         }
-        std::cout<<"GameRoom id "<<get_id()<<":"
-            <<"player "<<plr->get_nick()
-            <<" wrote this:"<<mes<<"\n";
         auto adm = std::dynamic_pointer_cast<Admin>(plr);
+        std::cout<<"GameRoom id "<<get_id()<<":";
         if(!adm){
+            std::cout<<"player "<<plr->get_nick()
+            <<" wrote this:"<<mes<<"\n";
             return;
         }else{
+            std::cout<<"admin "<<plr->get_nick()
+            <<" wrote this:"<<mes<<"\n";
             auto list = helpers::split(mes);
             check_settings_cmd(list);
             if(list.at(0) == shuffle_cmd){
