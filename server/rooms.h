@@ -47,12 +47,11 @@ public:
     ~Room(){
         players.clear();
     }
-    auto begin(){
-        return players.begin();
-    }
-    auto end(){
-        return players.end();
-    }
+    auto begin(){   return players.begin(); }
+    auto end(){     return players.end(); }
+    auto begin()const{  return players.begin(); }
+    auto end()const{    return players.end(); }
+
     auto get_requests(){
         return std::move(reqs);
     }
