@@ -48,7 +48,7 @@ public:
         if(plr){
             std::cerr<<"double /start from "<<plr->get_nick()<<"\n";
             plr->id = id;
-            writeTo(plr->id, "You are allready in waiting room");
+            writeTo(plr->id, "You are already in waiting room");
             return;
         }
         for(auto &r:rooms){
@@ -56,7 +56,7 @@ public:
             if(plr){
                 std::cerr<<"double /start from "<<plr->get_nick()<<"\n";
                 plr->id = id;
-                writeTo(plr->id, "You are allready in waiting room");
+                writeTo(plr->id, "You are already in waiting room");
                 return;
             }
         }
@@ -72,7 +72,7 @@ public:
         {
             auto wait_ptr = wait_room.findPlayer(id);
             if(wait_ptr){
-                std::string mes = "You are allready in waining room";
+                std::string mes = "You are already in waiting room";
                 writeTo(id, mes);
                 return;
             }
@@ -95,16 +95,18 @@ public:
                     "\nrun cmd /join to enter another room or /help to list available commands");
                 writeTo(adm->get_id(), ss.str());
             }else{ //exited user is admin
+		writeTo(adm->get_id(), "you've just successfully closed room "+r->get_id()+
+                        "\nrun cmd /join to enter new room, /create to make a new one or /help to list available commands");
                 r->removePlayer(plr); //remove exited player
                 plr = std::make_shared<Player>(adm->get_id(), adm->get_nick());
                 r->adm = nullptr;
-                std::string mes = "room host @"+plr->get_nick()+" exited room, now it'll be destroyed";
+                std::string mes = "room host @"+plr->get_nick()+" closed room, now it'll be destroyed";
                 auto pl_it = r->begin();
                 while(pl_it!=r->end()){
                     auto pl = *pl_it;
                     writeTo(pl->get_id(), mes);
-                    writeTo(pl->get_id(), "you've successfully exited room "+r->get_id()+
-                        "\nrun cmd /join to enter new room or /help to list available commands");
+                    writeTo(pl->get_id(), "you've just successfully exited room "+r->get_id()+
+                        "\nrun cmd /join to enter new room, /create to make a new one or /help to list available commands");
                     pl_it = r->removePlayer(pl_it); //remove player
                     wait_room.addPlayer(pl); //add him to waiting room
                 }
